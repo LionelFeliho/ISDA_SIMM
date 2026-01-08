@@ -1,43 +1,18 @@
-list_vega        = ['Risk_IRVol','Risk_InflationVol','Risk_CreditVol','Risk_CreditVolNonQ','Risk_EquityVol','Risk_CommodityVol','Risk_FXVol']
-full_bucket_list = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','Residual']
-simm_tenor_list  = ['2w','1m','3m','6m','1y','2y','3y','5y','10y','15y','20y','30y']
-list_rates       = ['Risk_IRCurve', 'Risk_Inflation', 'Risk_XCcyBasis', 'Risk_IRVol', 'Risk_InflationVol']
-list_fx          = ['Risk_FX', 'Risk_FXVol']
-list_creditQ     = ['Risk_CreditQ', 'Risk_CreditVol', 'Risk_BaseCorr']
-list_credit_nonQ = ['Risk_CreditNonQ', 'Risk_CreditVolNonQ']
-list_equity      = ['Risk_Equity', 'Risk_EquityVol']
-list_commodity   = ['Risk_Commodity', 'Risk_CommodityVol']
+"""Top-level package for SIMM constants loaded from config.json."""
+from __future__ import annotations
 
-dict_margin_by_risk_class =   {
+from .config import load_config
 
-    'Rates':     {'Delta'      :0, \
-                  'Vega'       :0, \
-                  'Curvature'  :0, \
-                  'BaseCorr'   :0},\
+CONFIG = load_config()
 
-    'FX':        {'Delta'      :0, \
-                  'Vega'       :0, \
-                  'Curvature'  :0, \
-                  'BaseCorr'   :0},\
+list_vega = CONFIG["lists"]["vega"]
+full_bucket_list = CONFIG["lists"]["full_bucket"]
+simm_tenor_list = CONFIG["lists"]["simm_tenor"]
+list_rates = CONFIG["lists"]["rates"]
+list_fx = CONFIG["lists"]["fx"]
+list_creditQ = CONFIG["lists"]["credit_qualifying"]
+list_credit_nonQ = CONFIG["lists"]["credit_non_qualifying"]
+list_equity = CONFIG["lists"]["equity"]
+list_commodity = CONFIG["lists"]["commodity"]
 
-    'CreditQ':   {'Delta'      :0, \
-                  'Vega'       :0, \
-                  'Curvature'  :0, \
-                  'BaseCorr'   :0},\
-
-    'CreditNonQ':{'Delta'      :0, \
-                  'Vega'       :0, \
-                  'Curvature'  :0, \
-                  'BaseCorr'   :0},\
-
-    'Equity':    {'Delta'      :0, \
-                  'Vega'       :0, \
-                  'Curvature'  :0, \
-                  'BaseCorr'   :0},\
-
-    'Commodity': {'Delta'      :0, \
-                  'Vega'       :0, \
-                  'Curvature'  :0, \
-                  'BaseCorr'   :0}
-                  
-}
+dict_margin_by_risk_class = CONFIG["dict_margin_by_risk_class"]
