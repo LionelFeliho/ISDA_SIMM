@@ -19,9 +19,12 @@ def load_config() -> Dict[str, Any]:
     The configuration path can be overridden via the ISDA_SIMM_CONFIG
     environment variable. Otherwise, it loads config.json from the repo root.
     """
-    config_path = Path(os.getenv(ENV_CONFIG_PATH, "")).expanduser()
+    raw_config_path = os.getenv(ENV_CONFIG_PATH, "")
+    config_path = Path(raw_config_path).expanduser() if raw_config_path else Path()
     if not config_path.as_posix():
         config_path = Path(__file__).resolve().parents[1] / DEFAULT_CONFIG_NAME
+    elif config_path.is_dir():
+        config_path = config_path / DEFAULT_CONFIG_NAME
 
     if not config_path.exists():
         raise FileNotFoundError(
