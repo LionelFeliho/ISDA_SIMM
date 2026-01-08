@@ -8,7 +8,26 @@ I've used an exiting repo to compute the spot SIMM, then I added a SWAGGER API a
 
 ## Getting Started
   - Place your [CRIF](https://www.isda.org/a/owEDE/risk-data-standards-v1-36-public.pdf) file under the folder "CRIF" with all columns needed for the calculation
-  - Run python -m main
+  - Run `python -m main`
+
+## Configuration
+All constant lists and default runtime values live in `config.json`. You can override the config path with `ISDA_SIMM_CONFIG` if you want to provide a different file.
+
+Key defaults in `config.json`:
+  - `defaults.crif_path`: path to the CRIF input file
+  - `defaults.calculation_currency`: calculation currency
+  - `defaults.exchange_rate`: exchange rate multiplier
+
+## Local Installation (optional)
+If you prefer a quick setup, use the helper script:
+  - `./scripts/setup_env.sh`
+  - `source .venv/bin/activate`
+  - `python -m main`
+
+## Docker (optional)
+Build and run using Docker:
+  - `docker build -t isda-simm .`
+  - `docker run --rm -v \"$(pwd)/CRIF:/app/CRIF\" isda-simm`
 
 ## Results Example
 |     SIMM Total     |    Add-On   |  Product Class  |  SIMM_ProductClass  |  Risk Class  |    SIMM_RiskClass    |  Risk Measure  |    SIMM_RiskMeasure   |
