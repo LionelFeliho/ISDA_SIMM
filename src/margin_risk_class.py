@@ -1,7 +1,12 @@
-import pandas      as pd
-from   math        import sqrt, isnan
-from   scipy.stats import norm
-from   copy        import deepcopy
+from __future__ import annotations
+
+import logging
+from copy import deepcopy
+from math import isnan, sqrt
+from typing import Dict, List
+
+import pandas as pd
+from scipy.stats import norm
 
 from . import utils
 from . import wnc
@@ -21,27 +26,34 @@ from . import (
     list_commodity,
 )
 
+LOGGER = logging.getLogger(__name__)
+
+
 class MarginByRiskClass:
-    def __init__(self, crif, calculation_currency):
-        self.crif    = crif
+    """Aggregate margins by SIMM risk class."""
+
+    def __init__(self, crif: pd.DataFrame, calculation_currency: str) -> None:
+        self.crif = crif
         self.results = dict_margin_by_risk_class
         self.calculation_currency = calculation_currency
         self.list_risk_types = utils.unique_list(self.crif, 'RiskType')
 
     # Delta Margin for Rates Risk Classes Only (Risk_IRCurve, Risk_Inflation, Risk_XCcyBasis)
-    def IRDeltaMargin(self):
+    def IRDeltaMargin(self) -> pd.DataFrame:
+        """Delta margin for rates risk classes only."""
         updates = deepcopy(dict_margin_by_risk_class)
 
         # Skip any risk types other than rates
         if ('Risk_IRCurve'   not in self.list_risk_types) and \
            ('Risk_Inflation' not in self.list_risk_types) and \
            ('Risk_XCcyBasis' not in self.list_risk_types):
+            LOGGER.debug("No rates risk types found; IR delta margin is zero.")
             return pd.DataFrame(updates)
 
         else:
-            dict_CR = {}
-            list_K  = []
-            list_S  = []
+            dict_CR: Dict[str, float] = {}
+            list_K: List[float] = []
+            list_S: List[float] = []
 
             crif = self.crif[(self.crif['RiskType'].isin(['Risk_IRCurve', 'Risk_Inflation', 'Risk_XCcyBasis']))]
             currency_list = utils.unique_list(crif, 'Qualifier')
@@ -161,7 +173,8 @@ class MarginByRiskClass:
             return pd.DataFrame(updates)
 
 
-    def DeltaMargin(self):
+    def DeltaMargin(self) -> pd.DataFrame:
+        """Delta margin for non-rates risk classes."""
         updates = deepcopy(dict_margin_by_risk_class)
 
         if (('Risk_FX'         not in self.list_risk_types) and \
@@ -169,6 +182,7 @@ class MarginByRiskClass:
             ('Risk_CreditNonQ' not in self.list_risk_types) and \
             ('Risk_Equity'     not in self.list_risk_types) and \
             ('Risk_Commodity'  not in self.list_risk_types)):
+            LOGGER.debug("No non-rates delta risk types found; delta margin is zero.")
             return pd.DataFrame(updates)
 
         else:
@@ -339,7 +353,8 @@ class MarginByRiskClass:
         return pd.DataFrame(updates)
 
 
-    def IRVegaMargin(self):
+    def IRVegaMargin(self) -> pd.DataFrame:
+        """Vega margin for rates risk classes."""
         updates = deepcopy(dict_margin_by_risk_class)
 
         list_K   = []
@@ -349,7 +364,7 @@ class MarginByRiskClass:
         allowed_risk_classes = [risk_class for risk_class in self.list_risk_types if risk_class in ['Risk_IRVol', 'Risk_InflationVol']]
         if ('Risk_IRVol' not in self.list_risk_types) and \
            ('Risk_InflationVol' not in self.list_risk_types):
-           
+            LOGGER.debug("No rates vega risk types found; IR vega margin is zero.")
             return pd.DataFrame(updates)
 
         else:
@@ -409,7 +424,8 @@ class MarginByRiskClass:
                 return pd.DataFrame(updates)
 
 
-    def VegaMargin(self):
+    def VegaMargin(self) -> pd.DataFrame:
+        """Vega margin for non-rates risk classes."""
         updates = deepcopy(dict_margin_by_risk_class)
         
         allowed_risk_classes = ['Risk_CreditVol','Risk_CreditVolNonQ','Risk_EquityVol','Risk_CommodityVol','Risk_FXVol']
@@ -596,10 +612,12 @@ class MarginByRiskClass:
         return pd.DataFrame(updates)
 
 
-    def IRCurvatureMargin(self):
+    def IRCurvatureMargin(self) -> pd.DataFrame:
+        """Curvature margin for rates risk classes."""
         updates = deepcopy(dict_margin_by_risk_class)
 
         if ('Risk_IRVol' not in self.list_risk_types) and ('Risk_InflationVol' not in self.list_risk_types):
+            LOGGER.debug("No rates curvature risk types found; IR curvature margin is zero.")
             return pd.DataFrame(updates)
 
         else:
@@ -668,7 +686,8 @@ class MarginByRiskClass:
                 return pd.DataFrame(updates)
 
 
-    def CurvatureMargin(self):
+    def CurvatureMargin(self) -> pd.DataFrame:
+        """Curvature margin for non-rates risk classes."""
         updates = deepcopy(dict_margin_by_risk_class)
         
         credit    = ['Risk_CreditVol','Risk_CreditVolNonQ']
@@ -882,9 +901,13 @@ class MarginByRiskClass:
         return pd.DataFrame(updates)
 
 
-    def BaseCorrMargin(self):
+    def BaseCorrMargin(self) -> pd.DataFrame:
+        """Base correlation margin for qualifying credit."""
         updates = deepcopy(dict_margin_by_risk_class)
         crif_base_corr = self.crif[(self.crif['RiskType'] == 'Risk_BaseCorr')]
+        if crif_base_corr.empty:
+            LOGGER.debug("No base correlation risk types found; base corr margin is zero.")
+            return pd.DataFrame(updates)
         list_WS = []
 
         qualifier_list = utils.unique_list(crif_base_corr, 'Qualifier')
