@@ -1,5 +1,10 @@
-import pandas as pd
+from __future__ import annotations
+
+import logging
 from math import sqrt
+from typing import Dict, Any
+
+import pandas as pd
 
 from . import wnc
 from . import utils
@@ -8,16 +13,20 @@ from .margin_risk_class import MarginByRiskClass
 
 
 class SIMM:
-    def __init__(self, crif, calculation_currency, exchange_rate):
+    """Compute SIMM for a CRIF portfolio."""
+
+    def __init__(self, crif: pd.DataFrame, calculation_currency: str, exchange_rate: float) -> None:
         self.crif = crif
-        self.simm = 0
+        self.simm = 0.0
         self.simm_break_down = pd.DataFrame()
         self.calc_currency = calculation_currency
         self.exchange_rate = exchange_rate
-        self.calculate_simm()  
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.calculate_simm()
     
     # Margin by six risk classes (IR, FX, Equity, Commodity, CreditQ, Credit Non-Q)
-    def simm_risk_class(self,crif):    
+    def simm_risk_class(self, crif: pd.DataFrame) -> Dict[str, Dict[str, float]]:
+        """Calculate SIMM for each risk class."""
         margin = MarginByRiskClass(crif, self.calc_currency)
         df_margin_aggregated = margin.IRDeltaMargin()     \
                              + margin.DeltaMargin()       \
@@ -41,7 +50,8 @@ class SIMM:
         return dict_margins
 
     # SIMM by product class
-    def simm_product(self, product_class):
+    def simm_product(self, product_class: str) -> float:
+        """Compute SIMM for a single product class."""
 
         crif = self.crif[(self.crif['ProductClass'] == product_class)]
      
@@ -67,7 +77,8 @@ class SIMM:
         return sqrt(simm_product)
 
     # Calculation by product class as a pivot data frame
-    def results_product_class(self, product_class):
+    def results_product_class(self, product_class: str) -> pd.DataFrame:
+        """Build a SIMM breakdown for a product class."""
         crif = self.crif[(self.crif['ProductClass'] == product_class)]
         dict_results = self.simm_risk_class(crif)
 
@@ -96,7 +107,8 @@ class SIMM:
 
         return pd.pivot_table(df_outerJoin, index=['Product Class','Risk Class','SIMM_RiskClass','Risk Measure'])
     
-    def addon_margin(self):
+    def addon_margin(self) -> float:
+        """Calculate add-on margin from the CRIF add-on fields."""
         crif_factorNotional = self.crif[(self.crif['RiskType'].isin(['Param_AddOnNotionalFactor','Notional']))]
         crif_fixed  = self.crif[self.crif['RiskType']=='Param_AddOnFixedAmount']
 
@@ -113,10 +125,13 @@ class SIMM:
     
         return addon
 
-    def calculate_simm(self):
-        addon_ms   = 0  # addon multiplicative scales
-        dict_addon = {}
-        df_total   = pd.DataFrame()
+    def calculate_simm(self) -> pd.DataFrame:
+        """Calculate and store total SIMM and breakdown."""
+        addon_ms   = 0.0  # addon multiplicative scales
+        dict_addon: Dict[str, float] = {}
+        df_total = pd.DataFrame()
+
+        self.logger.info("Calculating SIMM for %d product classes.", len(utils.product_list(self.crif)))
 
         for product_class in utils.product_list(self.crif):
             df_prod   = self.results_product_class(product_class)
@@ -136,6 +151,7 @@ class SIMM:
 
         addon_margin = round(addon_ms + self.addon_margin(), 2)
         self.simm  += addon_margin
+        self.logger.info("Computed add-on margin: %s", addon_margin)
 
         df_total['SIMM Total'] = self.simm        
         df_total = df_total.round(2)

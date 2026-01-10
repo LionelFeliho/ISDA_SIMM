@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import logging
+from typing import Optional
+
 import pandas as pd
 
 from Weights_and_Corr.v2_7 import *
@@ -8,12 +13,15 @@ from . import (
     list_commodity,
     list_rates,
     list_fx,
-    simm_tenor_list
-    
+    simm_tenor_list,
 )
 
 
-def RW(risk_class,bucket):
+LOGGER = logging.getLogger(__name__)
+
+
+def RW(risk_class: str, bucket: int) -> float:
+    """Return risk weight for a risk class and bucket."""
     if risk_class in list_creditQ:
         return creditQ_rw[bucket]
         
@@ -25,8 +33,15 @@ def RW(risk_class,bucket):
 
     elif risk_class in list_commodity:
         return commodity_rw[bucket]
+    raise KeyError(f"Unsupported risk class for RW: {risk_class}")
 
-def rho(risk_class,index1=None,index2=None,bucket=None):
+def rho(
+    risk_class: str,
+    index1: Optional[str] = None,
+    index2: Optional[str] = None,
+    bucket: Optional[int] = None,
+) -> float:
+    """Return correlation for the requested inputs."""
 
     if risk_class in list_rates:
         return pd.DataFrame(
@@ -62,8 +77,14 @@ def rho(risk_class,index1=None,index2=None,bucket=None):
 
     elif risk_class in list_commodity:
         return commodity_corr[bucket]
+    raise KeyError(f"Unsupported risk class for rho: {risk_class}")
 
-def gamma(risk_class,bucket1=None,bucket2=None):
+def gamma(
+    risk_class: str,
+    bucket1: Optional[str] = None,
+    bucket2: Optional[str] = None,
+) -> float:
+    """Return gamma (cross-bucket correlation) for the risk class."""
 
     if risk_class in list_creditQ:
         bucket_list = [str(i) for i in range(1,13)]
@@ -85,14 +106,16 @@ def gamma(risk_class,bucket1=None,bucket2=None):
         )[bucket1][bucket2]
 
     elif risk_class in list_commodity:
-        bucket_list = [str(i) for i in range(1,18)] 
+        bucket_list = [str(i) for i in range(1,18)]
         return pd.DataFrame(
             commodity_corr_non_res,
             columns=bucket_list,
-            index=bucket_list            
+            index=bucket_list,
         )[bucket1][bucket2]
+    raise KeyError(f"Unsupported risk class for gamma: {risk_class}")
 
-def T(risk_class,type,currency=None,bucket=None):
+def T(risk_class: str, type: str, currency: Optional[str] = None, bucket: Optional[int] = None) -> float:
+    """Return concentration thresholds for the risk class."""
     if type == 'Delta':
         if risk_class == 'Rates':
             try:
@@ -161,9 +184,11 @@ def T(risk_class,type,currency=None,bucket=None):
             elif (currency1 not in fx_category1+fx_category2) and (currency2 not in fx_category1+fx_category2):
                 T = fx_vega_CT['Category3-Category3']
 
+    LOGGER.debug("Threshold lookup for %s/%s computed: %s", risk_class, type, T)
     return T * 1000000
 
-def psi(risk_class1,risk_class2):
+def psi(risk_class1: str, risk_class2: str) -> float:
+    """Return cross-risk-class correlation parameter."""
     return pd.DataFrame(
         corr_params,
         columns = ['Rates','CreditQ','CreditNonQ','Equity','Commodity','FX'],
