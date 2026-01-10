@@ -1,0 +1,54 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{SIMM Sensitivities Ageing}
+\author{ISDA SIMM Implementation}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Purpose}
+This note documents the ageing methodology implemented in
+\texttt{src/sensivities\_ageing.py}. The goal is to take a spot (0D) CRIF file
+and roll sensitivities forward to each SIMM tenor bucket in
+\texttt{simm\_tenor\_list}.
+
+\section*{Tenor to Day Conversion}
+Each SIMM tenor is converted to a day count using:
+\[
+2w = 14,\quad m = \frac{365}{12},\quad y = 365.
+\]
+This aligns with the time scaling convention already used in the curvature
+scaling helper.
+
+\section*{Ageing Rule}
+For a sensitivity with original tenor $T_{\text{orig}}$ (in days) and an ageing
+horizon $T_{\text{age}}$ (also in days), we compute:
+\[
+T_{\text{rem}} = T_{\text{orig}} - T_{\text{age}}.
+\]
+If $T_{\text{rem}} \le 0$, the sensitivity is considered matured and is removed.
+Otherwise, the remaining tenor is bucketed to the nearest lower (or equal)
+SIMM tenor bucket:
+\[
+T_{\text{bucket}} = \max\{t \in \text{SIMM buckets} : t \le T_{\text{rem}}\}.
+\]
+This ensures we do not extend the maturity when rolling down sensitivities.
+
+\section*{Handling of Different Risk Types}
+The ageing algorithm applies to any CRIF row that uses \texttt{Label1} for
+tenor classification (e.g., IR, Credit, Equity, Commodity, and FX where
+relevant). Rows with non-tenor \texttt{Label1} values are left unchanged.
+
+\section*{Outputs}
+The function returns a dictionary of dataframes:
+\begin{itemize}
+  \item \textbf{0D}: the original spot CRIF.
+  \item \textbf{Each SIMM tenor}: the CRIF with rolled \texttt{Label1} buckets and
+        matured sensitivities removed.
+\end{itemize}
+
+\end{document}
