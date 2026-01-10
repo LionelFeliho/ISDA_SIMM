@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -35,10 +35,10 @@ def _tenor_to_days(tenor: str) -> Optional[float]:
     return None
 
 
-def _tenor_buckets() -> List[TenorBucket]:
+def _tenor_buckets(tenors: Sequence[str]) -> List[TenorBucket]:
     """Build sorted tenor buckets for bucketing remaining maturities."""
     buckets: List[TenorBucket] = []
-    for tenor in simm_tenor_list:
+    for tenor in tenors:
         days = _tenor_to_days(tenor)
         if days is None:
             continue
@@ -46,53 +46,82 @@ def _tenor_buckets() -> List[TenorBucket]:
     return sorted(buckets, key=lambda bucket: bucket.days)
 
 
-def _bucket_remaining_tenor(remaining_days: float, buckets: List[TenorBucket]) -> Optional[str]:
-    """Map remaining days to the nearest lower (or equal) SIMM tenor bucket."""
+def _bucket_remaining_tenor(
+    remaining_days: float,
+    buckets: List[TenorBucket],
+) -> List[Tuple[str, float]]:
+    """Map remaining days to tenor buckets with prorata temporis weights."""
     if remaining_days <= 0:
-        return None
-    chosen = None
+        return []
+
+    if remaining_days <= buckets[0].days:
+        return [(buckets[0].tenor, 1.0)]
+    if remaining_days >= buckets[-1].days:
+        return [(buckets[-1].tenor, 1.0)]
+
+    lower = buckets[0]
+    upper = buckets[-1]
     for bucket in buckets:
         if bucket.days <= remaining_days:
-            chosen = bucket.tenor
-        else:
+            lower = bucket
+        elif bucket.days > remaining_days:
+            upper = bucket
             break
-    return chosen or buckets[0].tenor
+
+    if lower.days == upper.days:
+        return [(lower.tenor, 1.0)]
+
+    weight_upper = (remaining_days - lower.days) / (upper.days - lower.days)
+    weight_lower = 1.0 - weight_upper
+    return [(lower.tenor, weight_lower), (upper.tenor, weight_upper)]
 
 
-def age_sensitivities(crif: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+def age_sensitivities(
+    crif: pd.DataFrame,
+    tenors: Optional[Sequence[str]] = None,
+) -> Dict[str, pd.DataFrame]:
     """Age spot sensitivities across SIMM tenor buckets.
 
-    Returns a dictionary keyed by "0D" (spot) and each tenor in simm_tenor_list.
+    Returns a dictionary keyed by "0D" (spot) and each tenor in the input list.
     For each tenor key, the CRIF sensitivities are aged by rolling down the
     Label1 tenor bucket by that amount. Sensitivities that mature are dropped.
     """
-    buckets = _tenor_buckets()
+    tenor_list = list(tenors) if tenors is not None else list(simm_tenor_list)
+    buckets = _tenor_buckets(tenor_list)
     if not buckets:
-        raise ValueError("No valid tenor buckets found in simm_tenor_list.")
+        raise ValueError("No valid tenor buckets found in the provided list.")
 
     if "Label1" not in crif.columns:
         raise KeyError("CRIF data must include a Label1 column for tenor aging.")
+    if "AmountUSD" not in crif.columns:
+        raise KeyError("CRIF data must include an AmountUSD column for prorata aging.")
 
     aged: Dict[str, pd.DataFrame] = {"0D": crif.copy()}
-    for ageing_tenor in simm_tenor_list:
+    for ageing_tenor in tenor_list:
         ageing_days = _tenor_to_days(ageing_tenor)
         if ageing_days is None:
             LOGGER.debug("Skipping unrecognized ageing tenor: %s", ageing_tenor)
             continue
 
-        df = crif.copy()
-        new_labels: List[Optional[str]] = []
-        for label in df["Label1"].tolist():
+        rows: List[dict] = []
+        for _, row in crif.iterrows():
+            label = row["Label1"]
             label_str = str(label).lower()
             original_days = _tenor_to_days(label_str)
             if original_days is None:
-                new_labels.append(label)
+                rows.append(row.to_dict())
                 continue
             remaining_days = original_days - ageing_days
-            new_labels.append(_bucket_remaining_tenor(remaining_days, buckets))
+            allocations = _bucket_remaining_tenor(remaining_days, buckets)
+            if not allocations:
+                continue
+            for tenor, weight in allocations:
+                new_row = row.to_dict()
+                new_row["Label1"] = tenor
+                new_row["AmountUSD"] = new_row["AmountUSD"] * weight
+                rows.append(new_row)
 
-        df["Label1"] = new_labels
-        df = df[df["Label1"].notna()].reset_index(drop=True)
+        df = pd.DataFrame(rows)
         aged[ageing_tenor] = df
         LOGGER.debug("Aged sensitivities for %s with %d rows.", ageing_tenor, len(df))
 

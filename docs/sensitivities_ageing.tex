@@ -13,8 +13,7 @@
 \section*{Purpose}
 This note documents the ageing methodology implemented in
 \texttt{src/sensivities\_ageing.py}. The goal is to take a spot (0D) CRIF file
-and roll sensitivities forward to each SIMM tenor bucket in
-\texttt{simm\_tenor\_list}.
+and roll sensitivities forward to each tenor bucket provided by the caller.
 
 \section*{Tenor to Day Conversion}
 Each SIMM tenor is converted to a day count using:
@@ -31,12 +30,18 @@ horizon $T_{\text{age}}$ (also in days), we compute:
 T_{\text{rem}} = T_{\text{orig}} - T_{\text{age}}.
 \]
 If $T_{\text{rem}} \le 0$, the sensitivity is considered matured and is removed.
-Otherwise, the remaining tenor is bucketed to the nearest lower (or equal)
-SIMM tenor bucket:
+Otherwise, the remaining tenor is bucketed using a prorata temporis rule
+between the nearest lower and upper buckets:
 \[
-T_{\text{bucket}} = \max\{t \in \text{SIMM buckets} : t \le T_{\text{rem}}\}.
+T_{\text{rem}} \in [T_{\text{low}}, T_{\text{up}}],\quad
+w_{\text{low}} = \frac{T_{\text{up}} - T_{\text{rem}}}{T_{\text{up}} - T_{\text{low}}},\quad
+w_{\text{up}} = 1 - w_{\text{low}}.
 \]
-This ensures we do not extend the maturity when rolling down sensitivities.
+The sensitivity is split into two rows with weights $w_{\text{low}}$ and
+$w_{\text{up}}$ assigned to $T_{\text{low}}$ and $T_{\text{up}}$, respectively.
+If $T_{\text{rem}}$ is below the minimum bucket, 100\% is assigned to the
+minimum bucket. If $T_{\text{rem}}$ is above the maximum bucket, 100\% is
+assigned to the maximum bucket.
 
 \section*{Handling of Different Risk Types}
 The ageing algorithm applies to any CRIF row that uses \texttt{Label1} for
