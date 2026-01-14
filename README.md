@@ -10,6 +10,20 @@ I've used an exiting repo to compute the spot SIMM, then I added a SWAGGER API a
   - Place your [CRIF](https://www.isda.org/a/owEDE/risk-data-standards-v1-36-public.pdf) file under the folder "CRIF" with all columns needed for the calculation
   - Run `python -m main`
 
+## Web API (Swagger)
+Expose the SIMM engine as a REST API with automatic Swagger/OpenAPI docs:
+  - Install dependencies: `pip install -r requirements.txt`
+  - Run the server: `uvicorn api:app --host 0.0.0.0 --port 8000`
+  - Open Swagger UI: `http://localhost:8000/docs`
+
+Example request using JSON CRIF records:
+  - `curl -X POST \"http://localhost:8000/simm\" -H \"Content-Type: application/json\" -d '{\"records\": [{\"ProductClass\": \"RatesFX\", \"RiskType\": \"Risk_FX\", \"Qualifier\": \"EURUSD\", \"Bucket\": \"1\", \"Label1\": \"\", \"Label2\": \"\", \"AmountUSD\": 1000}]}'`
+
+You can override defaults in the JSON payload:
+  - `curl -X POST \"http://localhost:8000/simm\" -H \"Content-Type: application/json\" -d '{\"records\": [{\"ProductClass\": \"RatesFX\", \"RiskType\": \"Risk_FX\", \"Qualifier\": \"EURUSD\", \"Bucket\": \"1\", \"Label1\": \"\", \"Label2\": \"\", \"AmountUSD\": 1000}], \"calculation_currency\": \"USD\", \"exchange_rate\": 1.0}'`
+
+If you omit the `records`, the API reads the default CRIF path from `config.json`.
+
 ## Configuration
 All constant lists and default runtime values live in `config.json`. You can override the config path with `ISDA_SIMM_CONFIG` if you want to provide a different file.
 
